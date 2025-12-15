@@ -24,9 +24,9 @@ SERIES_MAP = {
 
 # Define the data ranges
 FULL_HISTORY_YEARS = 5
-UPDATE_WINDOW_YEARS = 3 # Fetch data for the last 3 years on monthly updates
+UPDATE_WINDOW_YEARS = 3 
 
-# These globals are primarily for the initial_data_collection function
+# Global variables for initial history
 END_YEAR = datetime.now().year
 START_YEAR = END_YEAR - FULL_HISTORY_YEARS
 DATA_FILE_PATH = "data/bls_data.csv"
@@ -53,7 +53,7 @@ def get_bls_data(series_ids, start_year, end_year):
         if json_data.get('status', '').strip() == 'REQUEST_SUCCEEDED':
             return json_data['Results']['series']
         else:
-            print(f"BLS API Error: {json_data.get('message', 'Unknown Error')}")
+            print(f"BLS API Error: {json_data.get('message', 'Unknown Error')}. Status: {json_data.get('status')}")
             return None
     except requests.exceptions.RequestException as e:
         print(f"An error occurred during API request: {e}")
@@ -100,7 +100,7 @@ def process_data(series_results):
     df = df.sort_values(by='Date').reset_index(drop=True)
     return df
 
-# 1. Initial Data Collection
+# 1. Initial Data Collection (Generates the full file from scratch)
 def initial_data_collection():
     """Fetches full history (5 years) and saves the initial CSV."""
     print(f"Starting initial data collection from {START_YEAR} to {END_YEAR}...")
@@ -116,59 +116,63 @@ def initial_data_collection():
 
         df_final.to_csv(DATA_FILE_PATH, index=False)
         print(f"Successfully collected {len(df_final)} historical records and saved to {DATA_FILE_PATH}")
+        return True # Indicate success
     else:
         print("Initial data collection failed.")
+        return False # Indicate failure
 
-# 2. Monthly Data Update (GitHub Action)
+# 2. Universal Data Update/Creation Logic
 def update_data_and_save():
-    # 1. Handle Missing or Empty File (Should only be needed for robustness)
+    
+    # 1. Check for missing/empty/corrupt file (Handles the 'ValueError: Missing column' error)
     if not os.path.exists(DATA_FILE_PATH) or os.path.getsize(DATA_FILE_PATH) == 0:
-        print("Data file not found or is empty. Running initial data collection for full history.")
-        initial_data_collection() 
-        return
+        print("Initial run check: Data file does not exist or is empty. Attempting full historical collection.")
+        if initial_data_collection():
+            print("Full historical collection completed. Attempting one last read before exiting.")
+            # If successful, we exit here to ensure the newly created file is committed.
+            # The next action run will then follow the update path.
+            return
+        else:
+            print("CRITICAL ERROR: Initial data collection failed to save the file. Cannot proceed.")
+            return
 
-    # 2. Proceed with UPDATE logic
+    # 2. File exists and should have content. Read the existing data.
     try:
-        # Read the existing data. This assumes 'Date' is the correct column name.
+        # This is line 149, which has been consistently failing.
         df_existing = pd.read_csv(DATA_FILE_PATH, parse_dates=['Date'])
     
     except ValueError as e:
+        # Handle the case where the file exists but is corrupted (i.e., missing the 'Date' header)
         if "Missing column provided to 'parse_dates'" in str(e):
-            print("WARNING: Existing CSV file structure error. Deleting and running initial data collection to rebuild.")
+            print("WARNING: Existing CSV file structure error (corrupted header). Deleting and running initial collection to rebuild.")
             os.remove(DATA_FILE_PATH)
-            initial_data_collection()
+            # Recursively call the function. It will now hit the 'if not os.path.exists' block above.
+            update_data_and_save()
             return
-        raise
-        
-    # Find the latest date in the existing data
-    latest_date = df_existing['Date'].max()
-    print(f"Loaded existing data with {len(df_existing)} records.")
-    
-    # Define update window years (The missing part from your previous attempt)
+        raise # Re-raise other unexpected ValueErrors
+
+    # 3. Define update window years (CRITICAL: Needs to be defined here for the update path)
     current_year = datetime.now().year
     update_start_year = current_year - UPDATE_WINDOW_YEARS
-    update_end_year = current_year 
-
+    update_end_year = current_year
+    
+    latest_date = df_existing['Date'].max()
+    print(f"Loaded existing data with {len(df_existing)} records. Latest date: {latest_date}.")
     print(f"Fetching data for update/revisions from {update_start_year} to {update_end_year}...")
 
+    # 4. Fetch update data
     series_ids = list(SERIES_MAP.keys())
-    # Use the now-defined local variables
     series_data = get_bls_data(series_ids, update_start_year, update_end_year)
 
     if not series_data:
         print("Monthly update data collection failed.")
         return
 
-    # 3. Process the new data
+    # 5. Process, combine, and save
     df_new = process_data(series_data)
-
-    # 4. Combine data and drop duplicates (based on the Date column)
     df_combined = pd.concat([df_existing, df_new]).drop_duplicates(subset=['Date'], keep='last')
-
-    # 5. Final cleanup and save
     df_combined = df_combined.sort_values(by='Date').reset_index(drop=True)
 
-    # Check if any new records were actually added/updated
     new_records_count = len(df_combined) - len(df_existing)
     if new_records_count > 0:
         print(f"New data found! {new_records_count} new record(s) appended.")
@@ -179,12 +183,10 @@ def update_data_and_save():
     print(f"Data updated successfully. Total records now: {len(df_combined)}")
 
 
-# Main Execution Logic
+# --- Main Execution Logic ---
 if __name__ == "__main__":
     # Ensure data directory exists
     os.makedirs(os.path.dirname(DATA_FILE_PATH), exist_ok=True)
-
-    # We now combine the initial run and update logic into one robust call
-    # This simplifies the logic by letting update_data_and_save handle both scenarios.
+    
+    # Run the universal update/create logic
     update_data_and_save()
-
