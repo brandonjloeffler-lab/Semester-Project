@@ -57,7 +57,7 @@ if not df.empty:
         # 2. Last Date Updated (NEW)
         st.subheader("Data Status")
         last_date = df.index[-1].strftime('%B %Y')
-        st.info(f"📅 **Last Date Updated:** {last_date}")
+        st.info(f" **Last Date Updated:** {last_date}")
 
         st.markdown("---")
 
@@ -66,10 +66,10 @@ if not df.empty:
         st.subheader("Quick Navigation")
         st.markdown(
             """
-            * [💼 Labor Market Conditions](#labor-market-conditions)
-            * [🏭 Productivity and Hours](#productivity-and-hours)
-            * [💸 Inflation and Trade](#inflation-and-trade)
-            * [🔬 Statistical Analysis](#statistical-analysis-unemployment-vs-employment)
+            * [Labor Market Conditions](#labor-market-conditions)
+            * [Productivity and Hours](#productivity-and-hours)
+            * [Inflation and Trade](#inflation-and-trade)
+            * [Statistical Analysis](#statistical-analysis-unemployment-vs-employment)
             """
         )
 
@@ -85,7 +85,7 @@ if not df.empty:
 
     # EMPLOYMENT & LABOR PANEL
     # Added the anchor tag format (using header ID) for the Quick Navigation link
-    st.header("💼 Labor Market Conditions", anchor="labor-market-conditions")
+    st.header(" Labor Market Conditions", anchor="labor-market-conditions")
     col1, col2 = st.columns(2)
 
     with col1:
@@ -115,7 +115,7 @@ if not df.empty:
 
     #  PRODUCTIVITY PANEL
     # Added the anchor tag format (using header ID) for the Quick Navigation link
-    st.header("🏭 Productivity and Hours", anchor="productivity-and-hours")
+    st.header(" Productivity and Hours", anchor="productivity-and-hours")
     col3, col4 = st.columns(2)
 
     with col3:
@@ -146,7 +146,7 @@ if not df.empty:
             )
 
             st.plotly_chart(fig_output, use_container_width=True)
-            st.info("💡 **Note:** This series is released **quarterly**, resulting in only four points per year.")
+            st.info(" **Note:** This series is released **quarterly**, resulting in only four points per year.")
 
         else:
             st.warning(f"Data series '{OUTPUT_COLUMN}' not found in the data.")
@@ -166,7 +166,7 @@ if not df.empty:
 
     # INFLATION & TRADE PANELS
     # Added the anchor tag format (using header ID) for the Quick Navigation link
-    st.header("💸 Inflation and Trade", anchor="inflation-and-trade")
+    st.header(" Inflation and Trade", anchor="inflation-and-trade")
 
     st.subheader("CPI-U Less Food and Energy (Unadjusted)")
 
@@ -226,7 +226,7 @@ if not df.empty:
 
     # STATISTICAL ANALYSIS PANEL (OLS)
     # Added the anchor tag format (using header ID) for the Quick Navigation link
-    st.header("🔬 Statistical Analysis: Unemployment vs. Employment", anchor="statistical-analysis-unemployment-vs-employment")
+    st.header(" Statistical Analysis: Unemployment vs. Employment", anchor="statistical-analysis-unemployment-vs-employment")
     st.markdown(
         "**Objective:** Analyze the relationship between the **Unemployment Rate** "
         "and **Total Nonfarm Employment** using Ordinary Least Squares (OLS)."
@@ -268,4 +268,5 @@ if not df.empty:
         except Exception as e:
             st.error(f"Could not perform OLS regression with the selected data: {e}")
     else:
+
         st.warning("Not enough data points selected to perform OLS regression. Please widen the date range.")
