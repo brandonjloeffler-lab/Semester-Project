@@ -1,12 +1,11 @@
-# .github/workflows/data_update.yml
-
 name: Update BLS Data and Commit
 
 # Run this workflow every Monday at 3 AM UTC
+# You can adjust the 'cron' schedule here. '0 3 * * 1' means 3 AM UTC on Monday.
 on:
   schedule:
     - cron: '0 3 * * 1'
-  # Allow manual trigger from the GitHub Actions tab
+  # Allows you to manually trigger the data update from the 'Actions' tab on GitHub
   workflow_dispatch:
 
 jobs:
@@ -15,35 +14,32 @@ jobs:
 
     steps:
       - name: Checkout Repository
+        # Crucial: uses the secret token for write access to commit new data
         uses: actions/checkout@v4
         with:
-          # Use the special token to allow the workflow to commit back to the repo
           token: ${{ secrets.GH_TOKEN }}
 
-      - name: Set up Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
       - name: Install Dependencies
         run: |
+          # Install all libraries from requirements.txt
           pip install -r requirements.txt
 
       - name: Run Data Collection Script
-        # Replace 'collect_data.py' with the actual name of your data collection script.
-        # If your data collection is built into app.py (which is unusual for CI/CD), 
-        # you would run a function from it, e.g., 'python -c "from app import run_data_collection; run_data_collection()"'
-        # ASSUMPTION: You have a script named 'collect_data.py' that creates/updates data/bls_data.csv
         run: |
-          python collect_data.py # <--- Replace with your actual data collection command
+          # Execute the script that generates the data/bls_data.csv file
+          python collect_data.py
 
       - name: Commit and Push new data
-        # This action automatically checks for changes, commits them, and pushes them.
+        # This action automatically detects changes in the specified files, commits, and pushes them.
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "🤖 CI: Updated BLS Data"
-          # Files to commit. Ensure your CSV is here!
-          file_pattern: 'data/bls_data.csv'
-          # Required when using a secret token for permissions
+          # Only commit the data file, ignoring any other transient changes
+          file_pattern: 'data/bls_data.csv' 
           commit_user_name: 'github-actions[bot]'
           commit_user_email: 'github-actions[bot]@users.noreply.github.com'
