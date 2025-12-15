@@ -1,1 +1,49 @@
+# .github/workflows/data_update.yml
 
+name: Update BLS Data and Commit
+
+# Run this workflow every Monday at 3 AM UTC
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  # Allow manual trigger from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  update_data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # Use the special token to allow the workflow to commit back to the repo
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Data Collection Script
+        # Replace 'collect_data.py' with the actual name of your data collection script.
+        # If your data collection is built into app.py (which is unusual for CI/CD), 
+        # you would run a function from it, e.g., 'python -c "from app import run_data_collection; run_data_collection()"'
+        # ASSUMPTION: You have a script named 'collect_data.py' that creates/updates data/bls_data.csv
+        run: |
+          python collect_data.py # <--- Replace with your actual data collection command
+
+      - name: Commit and Push new data
+        # This action automatically checks for changes, commits them, and pushes them.
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🤖 CI: Updated BLS Data"
+          # Files to commit. Ensure your CSV is here!
+          file_pattern: 'data/bls_data.csv'
+          # Required when using a secret token for permissions
+          commit_user_name: 'github-actions[bot]'
+          commit_user_email: 'github-actions[bot]@users.noreply.github.com'
