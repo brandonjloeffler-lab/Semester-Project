@@ -2,5 +2,4 @@ requests
 pandas
 streamlit
 statsmodels
-time
 datetime
