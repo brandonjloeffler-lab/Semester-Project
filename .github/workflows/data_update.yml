@@ -7,12 +7,13 @@ on:
     - cron: '0 3 * * 1'
   # Allows you to manually trigger the data update from the 'Actions' tab on GitHub
   workflow_dispatch:
+
 jobs:
   update_data:
     runs-on: ubuntu-latest
 
-    steps: # <--- Start of the steps block
-      # --- Step 1: Checkout ---
+    steps:
+      # --- Step 1: Checkout Repository (Get write permissions via GH_TOKEN) ---
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
@@ -28,19 +29,28 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      # --- Step 4: Run Script (Line 32 is near here) ---
+      # --- Step 4: Run Script (Fetch Data Securely) ---
       - name: Run Data Collection Script
         run: python collect_data.py
         env:
           BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
 
-      - name: Commit and Push new data # <-- The auto-commit action
-      # --- Step 5: Commit and Push ---
-      - name: Commit and Push new data
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "🤖 CI: Updated BLS Data"
-          file_pattern: 'data/bls_data.csv'
-          add_options: '-f'
-          commit_user_name: 'github-actions[bot]'
-          commit_user_email: 'github-actions[bot]@users.noreply.github.com'
+      # --- Step 5: Commit and Push new data (Manual Git Commands for Reliability) ---
+      - name: Commit and Push new data (Manual)
+        run: |
+          # Configure Git identity for the commit
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Forcefully add the data file (crucial for new/untracked files like bls_data.csv)
+          git add -f data/bls_data.csv
+          
+          # Check if the file was added (i.e., if it was created/modified)
+          if git status --porcelain | grep -q data/bls_data.csv; then
+            echo "Data file created/modified. Committing and pushing..."
+            git commit -m "🤖 DATA: Update BLS data from scheduled GitHub Action"
+            # Push using the token provided in the checkout step
+            git push origin HEAD
+          else
+            echo "No changes to data/bls_data.csv detected. Skipping push."
+          fi
