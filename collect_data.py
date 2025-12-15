@@ -5,7 +5,11 @@ import time
 from datetime import datetime
 
 # --- Configuration ---
-BLS_API_KEY = os.getenv("BLS_API_KEY", "88317efad228417fb8b93e6d0796cb8e")
+BLS_API_KEY = os.getenv('BLS_API_KEY')
+
+if not BLS_API_KEY:
+    raise ValueError("BLS_API_KEY environment variable not set.")
+    
 BLS_API_URL = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
 
 SERIES_MAP = {
@@ -173,4 +177,5 @@ if __name__ == "__main__":
     else:
         # RUN 2+: File exists, run monthly update logic
         update_data_and_save()
+
      
