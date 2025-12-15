@@ -127,8 +127,28 @@ def initial_data_collection():
 
 # 2. Monthly Data Update (GitHub Action)
 def update_data_and_save():
-    """Fetches the latest data (last 3 years), merges it with existing data, and saves."""
+    # --- ADD THIS CHECK ---
+    if not os.path.exists(DATA_FILE_PATH) or os.path.getsize(DATA_FILE_PATH) == 0:
+        print("Data file not found or is empty. Running initial data collection.")
+        # Call the function that performs the full historical fetch (2020 to 2025)
+        # This function should be one that saves the data directly to DATA_FILE_PATH
+        initial_data_collection() # <--- Assuming this is the function that does the full fetch
+        return # Exit the update function as the file is now created
 
+    # --- ONLY proceed to read the CSV if the file exists and has content ---
+    try:
+        # Check the exact column name in your CSV! Is it 'Date', 'date', or something else?
+        # Use the name that matches your file structure.
+        df_existing = pd.read_csv(DATA_FILE_PATH, parse_dates=['Date'])
+    except ValueError as e:
+        # Add robust handling for a corrupted or incorrectly structured file
+        if "Missing column provided to 'parse_dates'" in str(e):
+            print("WARNING: CSV file structure error. Deleting and running initial data collection.")
+            os.remove(DATA_FILE_PATH)
+            initial_data_collection()
+            return
+        raise # Re-raise if it's a different ValueError
+        
     # 1. Determine the date range for the update
     update_start_year = datetime.now().year - UPDATE_WINDOW_YEARS
     update_end_year = datetime.now().year
@@ -179,3 +199,4 @@ if __name__ == "__main__":
         update_data_and_save()
 
      
+
