@@ -3,3 +3,4 @@ pandas
 streamlit
 statsmodels
 datetime
+plotly
