@@ -7,43 +7,39 @@ on:
     - cron: '0 3 * * 1'
   # Allows you to manually trigger the data update from the 'Actions' tab on GitHub
   workflow_dispatch:
-
 jobs:
   update_data:
     runs-on: ubuntu-latest
 
-    steps:
+    steps: # <--- Start of the steps block
+      # --- Step 1: Checkout ---
       - name: Checkout Repository
-        # Crucial: uses the secret token for write access to commit new data
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GH_TOKEN }}
 
+      # --- Step 2: Setup Python ---
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
+      # --- Step 3: Install Dependencies ---
       - name: Install Dependencies
-        run: |
-          # Install all libraries from requirements.txt
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
+
+      # --- Step 4: Run Script (Line 32 is near here) ---
       - name: Run Data Collection Script
-              run: |
-                # Execute the script that generates the data/bls_data.csv file
-                python collect_data.py
-              # IMPORTANT: You must also pass the API key here
-              env:
-                BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
-      
-            - name: Commit and Push new data (Test All Files) # <-- Must start with 6 spaces
-              # uses: starts with 8 spaces
-              uses: stefanzweifel/git-auto-commit-action@v5
-              # with: starts with 8 spaces
-              with:
-                # Parameters inside 'with:' must be indented 10 spaces
-                commit_message: "🤖 CI: Updated BLS Data"
-                file_pattern: 'data/bls_data.csv' # Reverting to specific file name for cleaner commit
-                add_options: '-f'
-                commit_user_name: 'github-actions[bot]'
-                commit_user_email: 'github-actions[bot]@users.noreply.github.com'
+        run: python collect_data.py
+        env:
+          BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+
+      # --- Step 5: Commit and Push ---
+      - name: Commit and Push new data
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🤖 CI: Updated BLS Data"
+          file_pattern: 'data/bls_data.csv'
+          add_options: '-f'
+          commit_user_name: 'github-actions[bot]'
+          commit_user_email: 'github-actions[bot]@users.noreply.github.com'
