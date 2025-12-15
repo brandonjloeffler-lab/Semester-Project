@@ -34,13 +34,11 @@ jobs:
           # Execute the script that generates the data/bls_data.csv file
           python collect_data.py
 
-      - name: Commit and Push new data
-        # This action automatically detects changes in the specified files, commits, and pushes them.
+- name: Commit and Push new data (Test All Files)
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "🤖 CI: Updated BLS Data"
-          # Only commit the data file, ignoring any other transient changes
-          file_pattern: 'data/bls_data.csv' 
-          add_options: '-f' # Forces adding of files, including newly created ones.
+          file_pattern: '.' # <--- Change to '.' to target ALL new files
+          add_options: '-f'
           commit_user_name: 'github-actions[bot]'
           commit_user_email: 'github-actions[bot]@users.noreply.github.com'
