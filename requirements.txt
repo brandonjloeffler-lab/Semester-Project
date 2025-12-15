@@ -3,4 +3,4 @@ pandas
 streamlit
 statsmodels
 datetime
-plotly
+plotly==5.23.0
