@@ -33,12 +33,6 @@ jobs:
         run: python collect_data.py
         env:
           BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
-      - name: Debug: Check File Status
-              run: |
-                echo "Listing files in data/ directory:"
-                ls -l data/
-                echo "Printing first 5 lines of the CSV (if it exists):"
-                head -n 5 data/bls_data.csv || echo "File head failed (file likely empty or non-existent)."
 
       - name: Commit and Push new data # <-- The auto-commit action
       # --- Step 5: Commit and Push ---
