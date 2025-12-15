@@ -17,6 +17,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
+          # Your Personal Access Token is needed here for write access
           token: ${{ secrets.GH_TOKEN }}
 
       # --- Step 2: Setup Python ---
@@ -33,23 +34,24 @@ jobs:
       - name: Run Data Collection Script
         run: python collect_data.py
         env:
+          # Securely passes the BLS_API_KEY from GitHub Secrets
           BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
 
       # --- Step 5: Commit and Push new data (Manual Git Commands for Reliability) ---
       - name: Commit and Push new data (Manual)
         run: |
-          # Configure Git identity for the commit
+          # 1. Configure Git identity for the commit
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
 
-          # Forcefully add the data file (crucial for new/untracked files like bls_data.csv)
+          # 2. Forcefully add the data file (crucial for new/untracked files)
           git add -f data/bls_data.csv
           
-          # Check if the file was added (i.e., if it was created/modified)
+          # 3. Check if the file was added (i.e., if it was created/modified)
           if git status --porcelain | grep -q data/bls_data.csv; then
             echo "Data file created/modified. Committing and pushing..."
             git commit -m "🤖 DATA: Update BLS data from scheduled GitHub Action"
-            # Push using the token provided in the checkout step
+            # 4. Push using the token from Step 1
             git push origin HEAD
           else
             echo "No changes to data/bls_data.csv detected. Skipping push."
