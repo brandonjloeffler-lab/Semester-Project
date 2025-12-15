@@ -1,317 +1,271 @@
-{
-  "nbformat": 4,
-  "nbformat_minor": 0,
-  "metadata": {
-    "colab": {
-      "provenance": [],
-      "authorship_tag": "ABX9TyMO19L0xZ5K9fNXJ9FwI3wb",
-      "include_colab_link": true
-    },
-    "kernelspec": {
-      "name": "python3",
-      "display_name": "Python 3"
-    },
-    "language_info": {
-      "name": "python"
-    }
-  },
-  "cells": [
-    {
-      "cell_type": "markdown",
-      "metadata": {
-        "id": "view-in-github",
-        "colab_type": "text"
-      },
-      "source": [
-        "<a href=\"https://colab.research.google.com/github/brandonjloeffler-lab/Semester-Project/blob/main/app.py\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": 1,
-      "metadata": {
-        "id": "eks-rm_yMoXt",
-        "colab": {
-          "base_uri": "https://localhost:8080/"
-        },
-        "outputId": "9252eb3b-91bc-4665-def0-8e3d4d20eb2f"
-      },
-      "outputs": [
-        {
-          "output_type": "stream",
-          "name": "stdout",
-          "text": [
-            "Writing app.py\n"
-          ]
-        }
-      ],
-      "source": [
-        "%%writefile app.py\n",
-        "import os\n",
-        "import sys\n",
-        "from datetime import datetime\n",
-        "import streamlit as st\n",
-        "import pandas as pd\n",
-        "import plotly.express as px\n",
-        "import plotly.graph_objects as go\n",
-        "import statsmodels.api as sm\n",
-        "\n",
-        "# Initiation\n",
-        "DATA_FILE_PATH = \"data/bls_data.csv\"\n",
-        "st.set_page_config(layout=\"wide\", page_title=\"US Labor & Economic Dashboard (BLS Data)\")\n",
-        "\n",
-        "@st.cache_data\n",
-        "def load_data(path):\n",
-        "    \"\"\"Loads the processed data from CSV, caches it for fast dashboard loading.\"\"\"\n",
-        "    try:\n",
-        "        df = pd.read_csv(path, parse_dates=['Date'])\n",
-        "        # Set date column is the index\n",
-        "        df.set_index('Date', inplace=True)\n",
-        "        return df\n",
-        "    except FileNotFoundError:\n",
-        "        st.error(f\"Data file not found at {path}. Please run the data collection script first.\")\n",
-        "\n",
-        "# Load data\n",
-        "df = load_data(DATA_FILE_PATH)\n",
-        "\n",
-        "if not df.empty:\n",
-        "\n",
-        "    # Sidebar\n",
-        "    with st.sidebar:\n",
-        "        st.header(\"Dashboard Control\")\n",
-        "\n",
-        "        # 1. Date Range Slider\n",
-        "        st.subheader(\"Select Date Range\")\n",
-        "        full_min_datetime = df.index.min().to_pydatetime()\n",
-        "        full_max_datetime = df.index.max().to_pydatetime()\n",
-        "\n",
-        "        start_date_slider, end_date_slider = st.slider(\n",
-        "            'Filter data between:',\n",
-        "            min_value=full_min_datetime,\n",
-        "            max_value=full_max_datetime,\n",
-        "            value=(full_min_datetime, full_max_datetime),\n",
-        "            format=\"YYYY-MM-DD\"\n",
-        "        )\n",
-        "\n",
-        "        start_timestamp = pd.to_datetime(start_date_slider)\n",
-        "        end_timestamp = pd.to_datetime(end_date_slider)\n",
-        "        df_filtered = df.loc[start_timestamp:end_timestamp]\n",
-        "\n",
-        "        st.markdown(\"---\")\n",
-        "\n",
-        "        # 2. Last Date\n",
-        "        st.subheader(\"Data Status\")\n",
-        "        last_date = df.index[-1].strftime('%B %Y')\n",
-        "        st.info(f\" **Last Date Updated:** {last_date}\")\n",
-        "\n",
-        "        st.markdown(\"---\")\n",
-        "\n",
-        "        # 3. Quick Links\n",
-        "        st.subheader(\"Quick Navigation\")\n",
-        "        st.markdown(\n",
-        "            \"\"\"\n",
-        "            * [ Labor Market Conditions](#labor-market-conditions)\n",
-        "            * [ Productivity and Hours](#productivity-and-hours)\n",
-        "            * [ Inflation and Trade](#inflation-and-trade)\n",
-        "            * [ Statistical Analysis](#statistical-analysis-unemployment-vs-employment)\n",
-        "            \"\"\"\n",
-        "        )\n",
-        "\n",
-        "    #  Main Heading\n",
-        "    st.title(\"US Labor & Economic Indicators Dashboard\")\n",
-        "    st.markdown(\"\"\"\n",
-        "        This interactive dashboard showcases key labor market, productivity, inflation, and trade\n",
-        "        trends using data collected from the US Bureau of Labor Statistics (BLS) Public API.\n",
-        "\n",
-        "    \"\"\")\n",
-        "    st.markdown(\"---\")\n",
-        "\n",
-        "\n",
-        "    # Employment/Labor Panel\n",
-        "\n",
-        "    st.header(\" Labor Market Conditions\", anchor=\"labor-market-conditions\")\n",
-        "    col1, col2 = st.columns(2)\n",
-        "\n",
-        "    with col1:\n",
-        "        st.subheader(\"Unemployment Rate (SA)\")\n",
-        "        fig_unemp = px.line(\n",
-        "            df_filtered,\n",
-        "            y='Unemployment_Rate_SA',\n",
-        "            title='Unemployment Rate Over Time',\n",
-        "            labels={'Unemployment_Rate_SA': 'Rate (%)'},\n",
-        "            height=400\n",
-        "        )\n",
-        "        st.plotly_chart(fig_unemp, use_container_width=True)\n",
-        "\n",
-        "    with col2:\n",
-        "        st.subheader(\"Total Nonfarm Employment (SA)\")\n",
-        "        fig_nonfarm = px.line(\n",
-        "            df_filtered,\n",
-        "            y='Total_Nonfarm_Employment_SA',\n",
-        "            title='Total Nonfarm Employment',\n",
-        "            labels={'Total_Nonfarm_Employment_SA': 'Employment (Thousands)'},\n",
-        "            height=400\n",
-        "        )\n",
-        "        st.plotly_chart(fig_nonfarm, use_container_width=True)\n",
-        "\n",
-        "    st.markdown(\"---\")\n",
-        "\n",
-        "\n",
-        "    #  Productivity Panel\n",
-        "    st.header(\" Productivity and Hours\", anchor=\"productivity-and-hours\")\n",
-        "    col3, col4 = st.columns(2)\n",
-        "\n",
-        "    with col3:\n",
-        "        st.subheader(\"Output Per Hour - Non-farm Business\")\n",
-        "\n",
-        "        OUTPUT_COLUMN = 'Output_Per_Hour_NF'\n",
-        "        if OUTPUT_COLUMN in df_filtered.columns:\n",
-        "\n",
-        "            fig_output = px.line(\n",
-        "                df_filtered.dropna(subset=[OUTPUT_COLUMN]), # Drop missing rows\n",
-        "                x=df_filtered.dropna(subset=[OUTPUT_COLUMN]).index,\n",
-        "                y=OUTPUT_COLUMN,\n",
-        "                title='Output Per Hour Index (Quarterly)',\n",
-        "                height=400,\n",
-        "                labels={'Output_Per_Hour_NF': 'Index Value'}\n",
-        "            )\n",
-        "\n",
-        "            fig_output.update_traces(\n",
-        "                mode='lines+markers',\n",
-        "                line=dict(width=3, color='firebrick'),\n",
-        "                marker=dict(size=8, symbol='circle', line=dict(width=1, color='DarkSlateGrey')),\n",
-        "                connectgaps=False\n",
-        "            )\n",
-        "\n",
-        "            fig_output.update_layout(\n",
-        "                xaxis_title='Date',\n",
-        "                yaxis_title='Index Value'\n",
-        "            )\n",
-        "\n",
-        "            st.plotly_chart(fig_output, use_container_width=True)\n",
-        "            st.info(\" **Note:** This series is released **quarterly**, resulting in only four points per year.\")\n",
-        "\n",
-        "        else:\n",
-        "            st.warning(f\"Data series '{OUTPUT_COLUMN}' not found in the data.\")\n",
-        "\n",
-        "    with col4:\n",
-        "        st.subheader(\"Total Private Average Weekly Hours\")\n",
-        "        fig_hours = px.line(\n",
-        "            df_filtered,\n",
-        "            y='Avg_Weekly_Hours_Private_SA',\n",
-        "            title='Average Weekly Hours',\n",
-        "            height=400\n",
-        "        )\n",
-        "        st.plotly_chart(fig_hours, use_container_width=True)\n",
-        "\n",
-        "    st.markdown(\"---\")\n",
-        "\n",
-        "\n",
-        "    # Inflation and Trade Panel\n",
-        "    st.header(\" Inflation and Trade\", anchor=\"inflation-and-trade\")\n",
-        "\n",
-        "    st.subheader(\"CPI-U Less Food and Energy (Unadjusted)\")\n",
-        "\n",
-        "    CPI_COLUMN = 'CPI_U_Ex_Food_Energy_U'\n",
-        "\n",
-        "    if CPI_COLUMN in df_filtered.columns:\n",
-        "        # Calculate Year-over-Year (YoY) percentage change\n",
-        "        df_filtered_cpi = df_filtered.copy()\n",
-        "        df_filtered_cpi['YoY_Change'] = df_filtered_cpi[CPI_COLUMN].pct_change(periods=12) * 100\n",
-        "\n",
-        "        # Create the bar chart for CPI\n",
-        "        fig_cpi = px.bar(\n",
-        "            df_filtered_cpi.dropna(subset=['YoY_Change']).reset_index(), # Drop initial from pct_change\n",
-        "            x='Date',\n",
-        "            y='YoY_Change',\n",
-        "            title='Inflation: CPI-U Less Food and Energy (YoY % Change)',\n",
-        "            labels={'YoY_Change': 'Year-over-Year Change (%)'},\n",
-        "            height=400,\n",
-        "            color='YoY_Change',\n",
-        "            color_continuous_scale=px.colors.diverging.RdYlGn_r\n",
-        "        )\n",
-        "\n",
-        "        fig_cpi.add_hline(y=0, line_dash=\"solid\", line_color=\"black\")\n",
-        "\n",
-        "        st.plotly_chart(fig_cpi, use_container_width=True)\n",
-        "\n",
-        "    else:\n",
-        "        st.warning(f\"Data series '{CPI_COLUMN}' not found in the CSV. Cannot display inflation chart.\")\n",
-        "\n",
-        "\n",
-        "    st.subheader(\"Imports vs. Exports (All Commodities)\")\n",
-        "\n",
-        "    df_trade = df_filtered.copy()\n",
-        "    df_trade['Trade_Balance'] = df_trade['Exports_All_Commodities_U'] - df_trade['Imports_All_Commodities_U']\n",
-        "\n",
-        "    # Combine the data for Plotly (Exports and Imports on the same axis)\n",
-        "    df_trade_melt = df_trade[['Exports_All_Commodities_U', 'Imports_All_Commodities_U']].reset_index().melt(\n",
-        "        id_vars='Date',\n",
-        "        var_name='Series',\n",
-        "        value_name='Value'\n",
-        "    )\n",
-        "\n",
-        "    fig_trade = px.line(\n",
-        "        df_trade_melt,\n",
-        "        x='Date',\n",
-        "        y='Value',\n",
-        "        color='Series',\n",
-        "        title='Trade: Imports and Exports for All Commodities',\n",
-        "        labels={'Value': 'Value ($ Billions?)'},\n",
-        "        height=400\n",
-        "    )\n",
-        "\n",
-        "    st.plotly_chart(fig_trade, use_container_width=True)\n",
-        "\n",
-        "\n",
-        "    st.markdown(\"---\")\n",
-        "\n",
-        "    # Statistical Analysis Panel (OLS)\n",
-        "\n",
-        "    st.header(\" Statistical Analysis: Unemployment vs. Employment\", anchor=\"statistical-analysis-unemployment-vs-employment\")\n",
-        "    st.markdown(\n",
-        "        \"**Objective:** Analyze the relationship between the **Unemployment Rate** \"\n",
-        "        \"and **Total Nonfarm Employment** using Ordinary Least Squares (OLS).\"\n",
-        "    )\n",
-        "\n",
-        "    # Prepare data for OLS\n",
-        "    ols_df = df_filtered[['Unemployment_Rate_SA', 'Total_Nonfarm_Employment_SA']].dropna()\n",
-        "\n",
-        "    if len(ols_df) > 5:\n",
-        "        try:\n",
-        "            # Define Variables\n",
-        "            Y = ols_df['Unemployment_Rate_SA']\n",
-        "            X = ols_df['Total_Nonfarm_Employment_SA']\n",
-        "            X = sm.add_constant(X) # Add the intercept term\n",
-        "\n",
-        "            # Run OLS Regression\n",
-        "            model = sm.OLS(Y, X)\n",
-        "            results = model.fit()\n",
-        "\n",
-        "            # Display results\n",
-        "            col_ols1, col_ols2 = st.columns(2)\n",
-        "            with col_ols1:\n",
-        "                st.info(f\"R-squared: **{results.rsquared:.4f}**\")\n",
-        "                st.info(f\"P-value (Nonfarm Employment): **{results.pvalues[1]:.4f}**\")\n",
-        "                st.info(f\"Coefficient (Employment): **{results.params[1]:.4e}**\") # Scientific notation for small coef\n",
-        "\n",
-        "            with col_ols2:\n",
-        "                # Create a scatter plot with the OLS line\n",
-        "                fig_ols = px.scatter(\n",
-        "                    ols_df,\n",
-        "                    x='Total_Nonfarm_Employment_SA',\n",
-        "                    y='Unemployment_Rate_SA',\n",
-        "                    title='OLS Regression: Unemployment vs. Nonfarm Employment',\n",
-        "                    trendline=\"ols\",\n",
-        "                    height=500\n",
-        "                )\n",
-        "                st.plotly_chart(fig_ols, use_container_width=True)\n",
-        "\n",
-        "        except Exception as e:\n",
-        "            st.error(f\"Could not perform OLS regression with the selected data: {e}\")\n",
-        "    else:\n",
-        "        st.warning(\"Not enough data points selected to perform OLS regression. Please widen the date range.\")"
-      ]
-    }
-  ]
-}
+import os
+import sys
+from datetime import datetime
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import statsmodels.api as sm
+
+# --- CONFIGURATION ---
+DATA_FILE_PATH = "data/bls_data.csv"
+st.set_page_config(layout="wide", page_title="US Labor & Economic Dashboard (BLS Data)")
+
+@st.cache_data
+def load_data(path):
+    """Loads the processed data from CSV, caches it for fast dashboard loading."""
+    try:
+        df = pd.read_csv(path, parse_dates=['Date'])
+        # Set date column is the index
+        df.set_index('Date', inplace=True)
+        return df
+    except FileNotFoundError:
+        st.error(f"Data file not found at {path}. Please run the data collection script first.")
+        # Log this error explicitly too
+        with open('/content/app_debug_logs.txt', 'a') as f:
+            f.write(f'[DEBUG APP] FileNotFoundError for {path} at {datetime.now()}\n')
+        return pd.DataFrame()
+
+# Load the data
+df = load_data(DATA_FILE_PATH)
+
+if not df.empty:
+
+    # --- SIDEBAR FILTERS (UPDATED) ---
+    with st.sidebar:
+        st.header("Dashboard Controls")
+
+        # 1. Date Range Slider (KEPT)
+        st.subheader("Select Date Range")
+        full_min_datetime = df.index.min().to_pydatetime()
+        full_max_datetime = df.index.max().to_pydatetime()
+
+        start_date_slider, end_date_slider = st.slider(
+            'Filter data between:',
+            min_value=full_min_datetime,
+            max_value=full_max_datetime,
+            value=(full_min_datetime, full_max_datetime),
+            format="YYYY-MM-DD"
+        )
+
+        start_timestamp = pd.to_datetime(start_date_slider)
+        end_timestamp = pd.to_datetime(end_date_slider)
+        df_filtered = df.loc[start_timestamp:end_timestamp]
+
+        st.markdown("---")
+
+        # 2. Last Date Updated (NEW)
+        st.subheader("Data Status")
+        last_date = df.index[-1].strftime('%B %Y')
+        st.info(f"📅 **Last Date Updated:** {last_date}")
+
+        st.markdown("---")
+
+        # 3. Quick Links / Table of Contents (NEW)
+        # Note: These are not true links but aid navigation on longer pages.
+        st.subheader("Quick Navigation")
+        st.markdown(
+            """
+            * [💼 Labor Market Conditions](#labor-market-conditions)
+            * [🏭 Productivity and Hours](#productivity-and-hours)
+            * [💸 Inflation and Trade](#inflation-and-trade)
+            * [🔬 Statistical Analysis](#statistical-analysis-unemployment-vs-employment)
+            """
+        )
+
+    #  MAIN DASHBOARD HEADER
+    st.title("US Labor & Economic Indicators Dashboard")
+    st.markdown("""
+        This interactive dashboard showcases key labor market, productivity, inflation, and trade
+        trends using data collected from the US Bureau of Labor Statistics (BLS) Public API.
+
+    """)
+    st.markdown("---")
+
+
+    # EMPLOYMENT & LABOR PANEL
+    # Added the anchor tag format (using header ID) for the Quick Navigation link
+    st.header("💼 Labor Market Conditions", anchor="labor-market-conditions")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Unemployment Rate (SA)")
+        fig_unemp = px.line(
+            df_filtered,
+            y='Unemployment_Rate_SA',
+            title='Unemployment Rate Over Time',
+            labels={'Unemployment_Rate_SA': 'Rate (%)'},
+            height=400
+        )
+        st.plotly_chart(fig_unemp, use_container_width=True)
+
+    with col2:
+        st.subheader("Total Nonfarm Employment (SA)")
+        fig_nonfarm = px.line(
+            df_filtered,
+            y='Total_Nonfarm_Employment_SA',
+            title='Total Nonfarm Employment',
+            labels={'Total_Nonfarm_Employment_SA': 'Employment (Thousands)'},
+            height=400
+        )
+        st.plotly_chart(fig_nonfarm, use_container_width=True)
+
+    st.markdown("---")
+
+
+    #  PRODUCTIVITY PANEL
+    # Added the anchor tag format (using header ID) for the Quick Navigation link
+    st.header("🏭 Productivity and Hours", anchor="productivity-and-hours")
+    col3, col4 = st.columns(2)
+
+    with col3:
+        st.subheader("Output Per Hour - Non-farm Business")
+
+        OUTPUT_COLUMN = 'Output_Per_Hour_NF'
+        if OUTPUT_COLUMN in df_filtered.columns:
+
+            fig_output = px.line(
+                df_filtered.dropna(subset=[OUTPUT_COLUMN]), # Drop missing rows
+                x=df_filtered.dropna(subset=[OUTPUT_COLUMN]).index,
+                y=OUTPUT_COLUMN,
+                title='Output Per Hour Index (Quarterly)',
+                height=400,
+                labels={'Output_Per_Hour_NF': 'Index Value'}
+            )
+
+            fig_output.update_traces(
+                mode='lines+markers',
+                line=dict(width=3, color='firebrick'),
+                marker=dict(size=8, symbol='circle', line=dict(width=1, color='DarkSlateGrey')),
+                connectgaps=False
+            )
+
+            fig_output.update_layout(
+                xaxis_title='Date',
+                yaxis_title='Index Value'
+            )
+
+            st.plotly_chart(fig_output, use_container_width=True)
+            st.info("💡 **Note:** This series is released **quarterly**, resulting in only four points per year.")
+
+        else:
+            st.warning(f"Data series '{OUTPUT_COLUMN}' not found in the data.")
+
+    with col4:
+        st.subheader("Total Private Average Weekly Hours")
+        fig_hours = px.line(
+            df_filtered,
+            y='Avg_Weekly_Hours_Private_SA',
+            title='Average Weekly Hours',
+            height=400
+        )
+        st.plotly_chart(fig_hours, use_container_width=True)
+
+    st.markdown("---")
+
+
+    # INFLATION & TRADE PANELS
+    # Added the anchor tag format (using header ID) for the Quick Navigation link
+    st.header("💸 Inflation and Trade", anchor="inflation-and-trade")
+
+    st.subheader("CPI-U Less Food and Energy (Unadjusted)")
+
+    CPI_COLUMN = 'CPI_U_Ex_Food_Energy_U'
+
+    if CPI_COLUMN in df_filtered.columns:
+        # Calculate Year-over-Year (YoY) percentage change
+        df_filtered_cpi = df_filtered.copy()
+        df_filtered_cpi['YoY_Change'] = df_filtered_cpi[CPI_COLUMN].pct_change(periods=12) * 100
+
+        # Create the bar chart for CPI
+        fig_cpi = px.bar(
+            df_filtered_cpi.dropna(subset=['YoY_Change']).reset_index(), # Drop initial from pct_change
+            x='Date',
+            y='YoY_Change',
+            title='Inflation: CPI-U Less Food and Energy (YoY % Change)',
+            labels={'YoY_Change': 'Year-over-Year Change (%)'},
+            height=400,
+            color='YoY_Change',
+            color_continuous_scale=px.colors.diverging.RdYlGn_r
+        )
+
+        fig_cpi.add_hline(y=0, line_dash="solid", line_color="black")
+
+        st.plotly_chart(fig_cpi, use_container_width=True)
+
+    else:
+        st.warning(f"Data series '{CPI_COLUMN}' not found in the CSV. Cannot display inflation chart.")
+
+
+    st.subheader("Imports vs. Exports (All Commodities)")
+
+    df_trade = df_filtered.copy()
+    df_trade['Trade_Balance'] = df_trade['Exports_All_Commodities_U'] - df_trade['Imports_All_Commodities_U']
+
+    # Combine the data for Plotly (Exports and Imports on the same axis)
+    df_trade_melt = df_trade[['Exports_All_Commodities_U', 'Imports_All_Commodities_U']].reset_index().melt(
+        id_vars='Date',
+        var_name='Series',
+        value_name='Value'
+    )
+
+    fig_trade = px.line(
+        df_trade_melt,
+        x='Date',
+        y='Value',
+        color='Series',
+        title='Trade: Imports and Exports for All Commodities',
+        labels={'Value': 'Value ($ Billions?)'},
+        height=400
+    )
+
+    st.plotly_chart(fig_trade, use_container_width=True)
+
+
+    st.markdown("---")
+
+    # STATISTICAL ANALYSIS PANEL (OLS)
+    # Added the anchor tag format (using header ID) for the Quick Navigation link
+    st.header("🔬 Statistical Analysis: Unemployment vs. Employment", anchor="statistical-analysis-unemployment-vs-employment")
+    st.markdown(
+        "**Objective:** Analyze the relationship between the **Unemployment Rate** "
+        "and **Total Nonfarm Employment** using Ordinary Least Squares (OLS)."
+    )
+
+    # Prepare data for OLS
+    ols_df = df_filtered[['Unemployment_Rate_SA', 'Total_Nonfarm_Employment_SA']].dropna()
+
+    if len(ols_df) > 5:
+        try:
+            # Define Variables
+            Y = ols_df['Unemployment_Rate_SA']
+            X = ols_df['Total_Nonfarm_Employment_SA']
+            X = sm.add_constant(X) # Add the intercept term
+
+            # Run OLS Regression
+            model = sm.OLS(Y, X)
+            results = model.fit()
+
+            # Display key results
+            col_ols1, col_ols2 = st.columns(2)
+            with col_ols1:
+                st.info(f"R-squared: **{results.rsquared:.4f}**")
+                st.info(f"P-value (Nonfarm Employment): **{results.pvalues[1]:.4f}**")
+                st.info(f"Coefficient (Employment): **{results.params[1]:.4e}**") # Scientific notation for small coef
+
+            with col_ols2:
+                # Create a scatter plot with the OLS line
+                fig_ols = px.scatter(
+                    ols_df,
+                    x='Total_Nonfarm_Employment_SA',
+                    y='Unemployment_Rate_SA',
+                    title='OLS Regression: Unemployment vs. Nonfarm Employment',
+                    trendline="ols", # Automatically adds the OLS line
+                    height=500
+                )
+                st.plotly_chart(fig_ols, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Could not perform OLS regression with the selected data: {e}")
+    else:
+        st.warning("Not enough data points selected to perform OLS regression. Please widen the date range.")
