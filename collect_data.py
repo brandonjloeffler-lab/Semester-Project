@@ -26,19 +26,14 @@ SERIES_MAP = {
 FULL_HISTORY_YEARS = 5
 UPDATE_WINDOW_YEARS = 3 # Fetch data for the last 3 years on monthly updates
 
+# These globals are primarily for the initial_data_collection function
 END_YEAR = datetime.now().year
 START_YEAR = END_YEAR - FULL_HISTORY_YEARS
 DATA_FILE_PATH = "data/bls_data.csv"
 
-# --- BLS API Fetch Function (No changes needed here) ---
+# --- BLS API Fetch Function ---
 def get_bls_data(series_ids, start_year, end_year):
     """Fetches data from the BLS API for the given series and date range."""
-    '''
-    # Check if API key is set before making the request
-    if BLS_API_KEY == "88317efad228417fb8b93e6d0796cb8e" or not BLS_API_KEY:
-        print("API Key not found. Please set the BLS_API_KEY environment variable.")
-        return None
-    '''
     headers = {'Content-type': 'application/json'}
     data = {
         "seriesid": series_ids,
@@ -56,7 +51,6 @@ def get_bls_data(series_ids, start_year, end_year):
         json_data = response.json()
 
         if json_data.get('status', '').strip() == 'REQUEST_SUCCEEDED':
-
             return json_data['Results']['series']
         else:
             print(f"BLS API Error: {json_data.get('message', 'Unknown Error')}")
@@ -65,9 +59,8 @@ def get_bls_data(series_ids, start_year, end_year):
         print(f"An error occurred during API request: {e}")
         return None
 
-#  Data Processing
+# --- Data Processing ---
 def process_data(series_results):
-
     processed_data = {}
 
     for series in series_results:
@@ -107,7 +100,7 @@ def process_data(series_results):
     df = df.sort_values(by='Date').reset_index(drop=True)
     return df
 
-#  1. Initial Data Collection
+# 1. Initial Data Collection
 def initial_data_collection():
     """Fetches full history (5 years) and saves the initial CSV."""
     print(f"Starting initial data collection from {START_YEAR} to {END_YEAR}...")
@@ -117,7 +110,8 @@ def initial_data_collection():
 
     if series_data:
         df_final = process_data(series_data)
-
+        
+        # Ensure data directory exists before saving
         os.makedirs(os.path.dirname(DATA_FILE_PATH), exist_ok=True)
 
         df_final.to_csv(DATA_FILE_PATH, index=False)
@@ -127,60 +121,59 @@ def initial_data_collection():
 
 # 2. Monthly Data Update (GitHub Action)
 def update_data_and_save():
-    # --- ADD THIS CHECK ---
+    # 1. Handle Missing or Empty File (Should only be needed for robustness)
     if not os.path.exists(DATA_FILE_PATH) or os.path.getsize(DATA_FILE_PATH) == 0:
-        print("Data file not found or is empty. Running initial data collection.")
-        # Call the function that performs the full historical fetch (2020 to 2025)
-        # This function should be one that saves the data directly to DATA_FILE_PATH
-        initial_data_collection() # <--- Assuming this is the function that does the full fetch
-        return # Exit the update function as the file is now created
+        print("Data file not found or is empty. Running initial data collection for full history.")
+        initial_data_collection() 
+        return
 
-    # --- ONLY proceed to read the CSV if the file exists and has content ---
+    # 2. Proceed with UPDATE logic
     try:
-        # Check the exact column name in your CSV! Is it 'Date', 'date', or something else?
-        # Use the name that matches your file structure.
+        # Read the existing data. This assumes 'Date' is the correct column name.
         df_existing = pd.read_csv(DATA_FILE_PATH, parse_dates=['Date'])
+    
     except ValueError as e:
-        # Add robust handling for a corrupted or incorrectly structured file
         if "Missing column provided to 'parse_dates'" in str(e):
-            print("WARNING: CSV file structure error. Deleting and running initial data collection.")
+            print("WARNING: Existing CSV file structure error. Deleting and running initial data collection to rebuild.")
             os.remove(DATA_FILE_PATH)
             initial_data_collection()
             return
-        raise # Re-raise if it's a different ValueError
+        raise
         
-    # 1. Determine the date range for the update
-    update_start_year = datetime.now().year - UPDATE_WINDOW_YEARS
-    update_end_year = datetime.now().year
+    # Find the latest date in the existing data
+    latest_date = df_existing['Date'].max()
+    print(f"Loaded existing data with {len(df_existing)} records.")
+    
+    # Define update window years (The missing part from your previous attempt)
+    current_year = datetime.now().year
+    update_start_year = current_year - UPDATE_WINDOW_YEARS
+    update_end_year = current_year 
 
-    print(f"Fetching data for update from {update_start_year} to {update_end_year}...")
+    print(f"Fetching data for update/revisions from {update_start_year} to {update_end_year}...")
 
     series_ids = list(SERIES_MAP.keys())
+    # Use the now-defined local variables
     series_data = get_bls_data(series_ids, update_start_year, update_end_year)
 
     if not series_data:
         print("Monthly update data collection failed.")
         return
 
-    # 2. Process the new data
+    # 3. Process the new data
     df_new = process_data(series_data)
 
-    # 3. Read the existing data
-    df_existing = pd.read_csv(DATA_FILE_PATH, parse_dates=['Date'])
-    print(f"Loaded existing data with {len(df_existing)} records.")
-
     # 4. Combine data and drop duplicates (based on the Date column)
-
     df_combined = pd.concat([df_existing, df_new]).drop_duplicates(subset=['Date'], keep='last')
 
     # 5. Final cleanup and save
     df_combined = df_combined.sort_values(by='Date').reset_index(drop=True)
 
     # Check if any new records were actually added/updated
-    if len(df_combined) > len(df_existing):
-        print(f"New data found! {len(df_combined) - len(df_existing)} new record(s) appended.")
+    new_records_count = len(df_combined) - len(df_existing)
+    if new_records_count > 0:
+        print(f"New data found! {new_records_count} new record(s) appended.")
     else:
-        print("No new records found, but potential revisions were saved.")
+        print("No new records found, assuming data was already up to date or revisions were applied.")
 
     df_combined.to_csv(DATA_FILE_PATH, index=False)
     print(f"Data updated successfully. Total records now: {len(df_combined)}")
@@ -191,12 +184,7 @@ if __name__ == "__main__":
     # Ensure data directory exists
     os.makedirs(os.path.dirname(DATA_FILE_PATH), exist_ok=True)
 
-    if not os.path.exists(DATA_FILE_PATH):
-        # RUN 1: File doesn't exist, run initial historical collection
-        initial_data_collection()
-    else:
-        # RUN 2+: File exists, run monthly update logic
-        update_data_and_save()
-
-     
+    # We now combine the initial run and update logic into one robust call
+    # This simplifies the logic by letting update_data_and_save handle both scenarios.
+    update_data_and_save()
 
